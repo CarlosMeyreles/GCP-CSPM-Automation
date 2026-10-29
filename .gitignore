@@ -1,0 +1,55 @@
+# =============================================================================
+# Project-wide gitignore
+# -----------------------------------------------------------------------------
+# What NEVER goes in the repo:
+#   - Terraform state (contains sensitive attributes, SA emails, IPs)
+#   - Terraform cache directories (per-machine, not portable)
+#   - Local Terraform zip caches (produced by archive_file)
+#   - Python bytecode and venvs
+#   - Secret files (gemini key, API keys, SA JSON)
+#   - IDE / OS junk
+# =============================================================================
+
+# ------- Terraform -------
+terraform/.terraform/
+terraform/.terraform.lock.hcl.backup
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars.backup
+terraform/.terraform-*-source.zip
+terraform/tfplan*
+
+# ------- Secrets (NEVER commit) -------
+*-credentials.json
+*-sa-key.json
+service-account*.json
+**/env.yaml                      # Function env files may contain secrets
+**/.env
+**/.env.local
+.gemini-api-key
+
+# ------- Python -------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.venv/
+venv/
+
+# ------- Cloud Shell / local -------
+/tmp/
+*.zip
+
+# ------- IDE / OS junk -------
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+Thumbs.db
+# For production, uncomment to prevent tfvars commits:
+# terraform/terraform.tfvars

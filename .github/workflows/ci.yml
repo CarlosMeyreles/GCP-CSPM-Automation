@@ -1,0 +1,116 @@
+# =============================================================================
+# ci.yml — Continuous Integration for CSPM Automation
+# -----------------------------------------------------------------------------
+# Runs on every push and pull request. Five checks, all passing required
+# before merge:
+#   1. terraform fmt -check  — code style consistency
+#   2. terraform validate    — HCL syntax + reference validation
+#   3. checkov               — Terraform security misconfigurations
+#   4. pytest                — Python business logic (17 unit tests)
+#   5. gitleaks              — secrets accidentally committed
+#
+# Security design:
+#   - NO GCP credentials. Validation-only. If this workflow is ever
+#     compromised, blast radius = zero.
+#   - permissions block grants only contents: read (least-privilege workflow)
+#   - Pinned action versions where supply-chain matters
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+# LEAST-PRIVILEGE WORKFLOW: only read the repo contents. Can't push, can't
+# comment, can't modify issues. A compromised action has nowhere to go.
+permissions:
+  contents: read
+
+jobs:
+  # ===========================================================================
+  # Terraform validation — syntax, formatting, security scanning
+  # ===========================================================================
+  terraform:
+    name: Terraform Validate + Checkov
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive
+        working-directory: ./terraform
+
+      # Validate uses -backend=false because our backend is GCS and CI has
+      # no GCP credentials. We only need to validate syntax + references.
+      - name: Terraform init (no backend)
+        run: terraform init -backend=false
+        working-directory: ./terraform
+
+      - name: Terraform validate
+        run: terraform validate
+        working-directory: ./terraform
+
+      - name: Checkov scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/
+          framework: terraform
+          # soft_fail: true for the initial setup so we can see all findings
+          # without the workflow failing. We'll flip this to false in Step 21
+          # after reviewing and either fixing or suppressing each finding.
+          soft_fail: true
+          output_format: cli
+          download_external_modules: false
+
+  # ===========================================================================
+  # Python unit tests — our 17-test suite from Step 19
+  # ===========================================================================
+  python:
+    name: Python Unit Tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install runtime dependencies
+        run: pip install --quiet -r functions/cspm-scanner/requirements.txt
+
+      - name: Install dev dependencies
+        run: pip install --quiet -r functions/cspm-scanner/tests/requirements-dev.txt
+
+      - name: Run pytest
+        run: python -m pytest tests/ -v --tb=short
+        working-directory: ./functions/cspm-scanner
+
+  # ===========================================================================
+  # Secret scanning — detect credentials accidentally committed
+  # ===========================================================================
+  secrets:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Full history needed for gitleaks to scan everything
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # No license needed for public repos; action handles this gracefully.
+          # GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false  # uncomment to disable artifact upload
+          GITLEAKS_ENABLE_COMMENTS: false

@@ -1,0 +1,9 @@
+# Cloud Functions Python runtime dependencies.
+# Pinned to major versions to prevent surprise upgrades on redeploy.
+
+functions-framework==3.*                # The HTTP wrapper Cloud Functions uses
+google-cloud-asset==3.*                 # Cloud Asset Inventory client (scanner.py)
+google-cloud-storage==2.*               # Cloud Storage client (scanner + remediator)
+google-cloud-resource-manager==1.*      # Project IAM for remediator (fix_iam_bindings)
+google-cloud-bigquery==3.*              # For scan_history + remediation_log writes
+google-cloud-logging==3.*               # Structured logging to Cloud Logging
