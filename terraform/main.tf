@@ -237,6 +237,7 @@ resource "google_project_iam_member" "cspm_scanner_custom_role" {
 # =============================================================================
 
 resource "google_bigquery_dataset" "cspm_results" {
+  #checkov:skip=CKV_GCP_81:Google-managed encryption at rest is on by default. CMEK needs a Cloud KMS key with recurring cost and key lifecycle overhead. Enterprise would use CMEK per data classification.
   dataset_id    = "cspm_results"
   friendly_name = "CSPM Scan + Remediation Results"
   description   = "Tables holding scanner output, remediation audit trail, and AI agent interaction log."
@@ -256,6 +257,8 @@ resource "google_bigquery_dataset" "cspm_results" {
 # =============================================================================
 
 resource "google_bigquery_table" "scan_history" {
+  #checkov:skip=CKV_GCP_80:Google-managed encryption at rest is on by default. CMEK needs a Cloud KMS key with recurring cost and key lifecycle overhead. Enterprise would use CMEK per data classification.
+  #checkov:skip=CKV_GCP_121:Lab project must be fully removable with terraform destroy and teardown.sh. Enterprise would enable deletion_protection on production tables.
   dataset_id          = google_bigquery_dataset.cspm_results.dataset_id
   table_id            = "scan_history"
   deletion_protection = false # Allow terraform destroy to drop this table
@@ -334,6 +337,8 @@ resource "google_bigquery_table" "scan_history" {
 # =============================================================================
 
 resource "google_bigquery_table" "remediation_log" {
+  #checkov:skip=CKV_GCP_80:Google-managed encryption at rest is on by default. CMEK needs a Cloud KMS key with recurring cost and key lifecycle overhead. Enterprise would use CMEK per data classification.
+  #checkov:skip=CKV_GCP_121:Lab project must be fully removable with terraform destroy and teardown.sh. Enterprise would enable deletion_protection on production tables.
   dataset_id          = google_bigquery_dataset.cspm_results.dataset_id
   table_id            = "remediation_log"
   deletion_protection = false
@@ -424,6 +429,8 @@ resource "google_bigquery_table" "remediation_log" {
 # =============================================================================
 
 resource "google_bigquery_table" "agent_audit_log" {
+  #checkov:skip=CKV_GCP_80:Google-managed encryption at rest is on by default. CMEK needs a Cloud KMS key with recurring cost and key lifecycle overhead. Enterprise would use CMEK per data classification.
+  #checkov:skip=CKV_GCP_121:Lab project must be fully removable with terraform destroy and teardown.sh. Enterprise would enable deletion_protection on production tables.
   dataset_id          = google_bigquery_dataset.cspm_results.dataset_id
   table_id            = "agent_audit_log"
   deletion_protection = false
@@ -498,6 +505,7 @@ resource "google_bigquery_table" "agent_audit_log" {
 # =============================================================================
 
 resource "google_storage_bucket" "cspm_reports" {
+  #checkov:skip=CKV_GCP_62:Access logging needs a second log bucket. Admin Activity audit logs are on by default. Enterprise would route logs to a central log sink project.
   name          = "cspm-reports-${var.project_id}"
   location      = "US" # Multi-region for durability + cheap storage
   storage_class = "STANDARD"

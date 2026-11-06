@@ -64,10 +64,10 @@ jobs:
         with:
           directory: terraform/
           framework: terraform
-          # soft_fail: true for the initial setup so we can see all findings
+          # soft_fail: false for the initial setup so we can see all findings
           # without the workflow failing. We'll flip this to false in Step 21
           # after reviewing and either fixing or suppressing each finding.
-          soft_fail: true
+          soft_fail: false
           output_format: cli
           download_external_modules: false
 
