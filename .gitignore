@@ -53,3 +53,4 @@ venv/
 Thumbs.db
 # For production, uncomment to prevent tfvars commits:
 # terraform/terraform.tfvars
+.pytest_cache/
