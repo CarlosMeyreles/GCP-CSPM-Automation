@@ -730,3 +730,70 @@ resource "google_cloud_scheduler_job" "daily_cspm_scan" {
     google_cloudfunctions2_function_iam_member.cspm_scanner_invoker,
   ]
 }
+
+# =============================================================================
+# POSTURE ADVISOR AGENT: identity, permissions, secret container
+# -----------------------------------------------------------------------------
+# The agent can READ findings and WRITE only its own audit log. It has no
+# permission to change any bucket or IAM policy, so it cannot remediate.
+# =============================================================================
+resource "google_service_account" "cspm_agent" {
+  project      = var.project_id
+  account_id   = "cspm-agent"
+  display_name = "CSPM Posture Advisor Agent (read-only)"
+  description  = "Runs the posture advisor agent. Reads findings, writes only its own audit log."
+
+  depends_on = [google_project_service.enabled]
+}
+
+# Read-only on the two tables the agent's tools query.
+resource "google_bigquery_table_iam_member" "agent_read_scan_history" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.cspm_results.dataset_id
+  table_id   = google_bigquery_table.scan_history.table_id
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${google_service_account.cspm_agent.email}"
+}
+
+resource "google_bigquery_table_iam_member" "agent_read_remediation_log" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.cspm_results.dataset_id
+  table_id   = google_bigquery_table.remediation_log.table_id
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${google_service_account.cspm_agent.email}"
+}
+
+# Write access ONLY on the agent's own audit table.
+resource "google_bigquery_table_iam_member" "agent_write_audit_log" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.cspm_results.dataset_id
+  table_id   = google_bigquery_table.agent_audit_log.table_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${google_service_account.cspm_agent.email}"
+}
+
+# BigQuery requires jobUser at project level to run any query. Grants no data access.
+resource "google_project_iam_member" "agent_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.cspm_agent.email}"
+}
+
+# Secret container only. The key VALUE is added by hand so it never enters code or state.
+resource "google_secret_manager_secret" "gemini_api_key" {
+  project   = var.project_id
+  secret_id = "gemini-api-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.enabled]
+}
+
+resource "google_secret_manager_secret_iam_member" "agent_reads_key" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.gemini_api_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cspm_agent.email}"
+}
