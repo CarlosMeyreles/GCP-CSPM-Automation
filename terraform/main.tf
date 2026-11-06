@@ -615,7 +615,7 @@ resource "google_cloudfunctions2_function" "cspm_scanner" {
     max_instance_count             = 3
     min_instance_count             = 0
     available_memory               = "512Mi"
-    available_cpu               = "1"
+    available_cpu                  = "1"
     timeout_seconds                = 540
     ingress_settings               = "ALLOW_INTERNAL_ONLY"
     all_traffic_on_latest_revision = true
