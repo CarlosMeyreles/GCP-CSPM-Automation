@@ -6,7 +6,7 @@
 #   1. terraform fmt -check  — code style consistency
 #   2. terraform validate    — HCL syntax + reference validation
 #   3. checkov               — Terraform security misconfigurations
-#   4. pytest                — Python business logic (17 unit tests)
+#   4. pytest                — Python business logic (54 unit tests: 17 scanner + 37 agent)
 #   5. gitleaks              — secrets accidentally committed
 #
 # Security design:
@@ -95,6 +95,12 @@ jobs:
       - name: Run pytest
         run: python -m pytest tests/ -v --tb=short
         working-directory: ./functions/cspm-scanner
+
+      - name: Install agent test dependencies
+        run: pip install --quiet -r agent/requirements-test.txt
+
+      - name: Run agent pytest
+        run: python -m pytest agent/tests -v --tb=short
 
   # ===========================================================================
   # Secret scanning — detect credentials accidentally committed

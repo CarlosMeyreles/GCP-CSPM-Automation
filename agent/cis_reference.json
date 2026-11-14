@@ -1,0 +1,33 @@
+{
+  "benchmark_version": "CIS Google Cloud Platform Foundation Benchmark v3.0.0 (control numbers change between versions)",
+  "controls": {
+    "5.1": {
+      "title": "Ensure That Cloud Storage Bucket Is Not Anonymously or Publicly Accessible",
+      "level": 1,
+      "why_it_matters": "Granting allUsers or allAuthenticatedUsers on a bucket lets anyone on the internet read its contents.",
+      "how_this_project_addresses_it": "The scanner flags public IAM bindings and buckets without public access prevention. The remediator enforces public access prevention, which blocks public access even if an allUsers binding remains. Removing bucket-level bindings is not automated; the allowlist skips them and a human reviews the drafted fix.",
+      "related_finding_categories": ["PUBLIC_IAM_BINDING", "PUBLIC_BUCKET_ACCESS"]
+    },
+    "5.2": {
+      "title": "Ensure That Cloud Storage Buckets Have Uniform Bucket-Level Access Enabled",
+      "level": 2,
+      "why_it_matters": "Uniform bucket-level access removes per-object ACLs, so a bucket that is not public cannot have public objects.",
+      "how_this_project_addresses_it": "The reports bucket and the Terraform state bucket are created with uniform bucket-level access, and the demo bucket uses it too.",
+      "related_finding_categories": ["PUBLIC_BUCKET_ACCESS"]
+    },
+    "1.5": {
+      "title": "Ensure That Service Account Has No Admin Privileges",
+      "level": 1,
+      "why_it_matters": "A service account with Admin, Editor or Owner roles can do far more than its job needs, so a leak or bug has a large blast radius.",
+      "how_this_project_addresses_it": "cspm-scanner uses a custom role with only the permissions it needs. cspm-agent has only table-level BigQuery roles, jobUser, and access to a single secret.",
+      "related_finding_categories": []
+    },
+    "1.6": {
+      "title": "Ensure That IAM Users Are Not Assigned the Service Account User or Service Account Token Creator Roles at Project Level",
+      "level": 1,
+      "why_it_matters": "At project level these roles reach every service account in the project, including future ones, which allows privilege escalation.",
+      "how_this_project_addresses_it": "Token Creator is granted to the operator on each specific service account, never at project level.",
+      "related_finding_categories": []
+    }
+  }
+}
