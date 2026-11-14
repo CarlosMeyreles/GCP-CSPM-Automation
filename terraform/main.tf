@@ -594,7 +594,7 @@ resource "google_storage_bucket_object" "cspm_scanner_source" {
 #   1. service_account_email = cspm-scanner SA (least-privilege, not default)
 #   2. ingress_settings = ALLOW_INTERNAL_ONLY (no public internet access)
 #   3. max_instance_count = 3 (cost blast-radius cap)
-#   4. available_memory = 256Mi (minimum useful; scanner is I/O-bound not CPU)
+#   4. available_memory = 512Mi (256Mi was OOM-killed; see README debugging stories)
 #   5. timeout_seconds = 540 (9 min; well under Gen 2 max of 60 min)
 #   6. no all_traffic_on_latest_revision allUsers invoker
 #   7. environment_variables for config (never secrets)
