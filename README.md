@@ -192,6 +192,10 @@ When asked to change something, it declines and offers a draft for a human to re
 
 <a href="screenshots/20-agent-refuses-remediation.PNG"><img src="screenshots/20-agent-refuses-remediation.PNG" width="780" alt="Agent refuses remediation"></a>
 
+Asked for the fix itself, it looks up the finding and returns the draft: the `gcloud` commands and the Terraform change for a human to review. Nothing runs.
+
+<a href="screenshots/23-agent-draft-fix.png"><img src="screenshots/23-agent-draft-fix.png" width="780" alt="Agent drafts a fix for human review"></a>
+
 Every interaction is recorded:
 
 <a href="screenshots/21-agent-audit-log.PNG"><img src="screenshots/21-agent-audit-log.PNG" width="780" alt="Agent audit log"></a>
@@ -233,6 +237,7 @@ Stated up front, because they are real:
 - **The deployed Cloud Function was unreliable.** After a Terraform reconciliation it returned intermittent 404s, so the demo runs the same code locally. The code, tests and Terraform are unchanged.
 - **Security Command Center needs an organization** for project-level activation. Cloud Asset Inventory with a Storage API fallback replaces it here.
 - **Bucket-level IAM binding removal is not automated.** The allowlist skips it, and the agent drafts the fix for a human.
+- **Drafts are not copy-ready.** The drafted `gcloud` command leaves a `--role=ROLE` placeholder for the reviewer to fill in. Looking up the actual role is a planned improvement.
 - **The audit log is not truly append-only.** BigQuery has no insert-only role, so the writer has table edit rights. A log sink to a locked bucket would close this.
 - **Free-tier Gemini may use prompts for product improvement.** This project contains no sensitive data. A real deployment would use a paid or Vertex AI endpoint.
 - **This is a single-project, personal-scale demo**, not an enterprise rollout.
