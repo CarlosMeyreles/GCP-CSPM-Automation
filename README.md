@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-A cloud security posture management tool for Google Cloud, **deployed 100% with Terraform**. It scans a project for storage misconfigurations, classifies findings by severity, and can fix them automatically behind several safety controls (dry-run by default, an allowlist, idempotency, before/after capture). Every action lands in an audit trail in BigQuery.
+A cloud security posture management tool for Google Cloud, **provisioned with Terraform**. It scans a project for storage misconfigurations, classifies findings by severity, and can fix them automatically behind several safety controls (dry-run by default, an allowlist, idempotency, before/after capture). Every action lands in an audit trail in BigQuery.
 
-On top of the pipeline sits a **read-only Posture Advisor Agent** (Google ADK with Gemini). It answers questions about the findings in plain English, drafts suggested fixes as text, and is built so that it **cannot change anything**: it has no write permissions, a hard cap on tool calls, schema-validated answers, and a full audit log.
+On top of the pipeline sits a **read-only Posture Advisor Agent** (Google ADK with Gemini). It answers questions about the findings in plain English, drafts suggested fixes as text, and is built so that it **cannot change anything**: it has no write access to the infrastructure it reports on (it can only append to its own audit table), a hard cap on tool calls, schema-validated answers, and a full audit log.
 
 Everything validates in CI **without any GCP credentials**: Terraform format and validate, Checkov in strict mode, 54 unit tests, and a gitleaks scan of the full git history.
 
@@ -115,9 +115,16 @@ The scripts get a short-lived token by impersonating a service account. No key f
 
 The Terraform state holds 41 entries: 39 managed resources (32 for the core pipeline and 7 for the agent) plus 2 data sources. It includes the enabled APIs, a VPC, subnet and deny-all-ingress firewall, the scanner service account and its custom role, the Cloud Function and its source object, the scheduler job, the reports bucket, the BigQuery dataset and three tables, and the agent's service account, table-level grants and secret container.
 
-A drift check after apply reports no differences:
+A few bootstrap steps stay outside Terraform on purpose: the remote-state bucket (it must exist before Terraform can use it), the token-creator grants that let the operator impersonate the service accounts, the Gemini key value, and the demo bucket created for the remediation demo.
 
-<a href="screenshots/04-terraform-apply-success.PNG"><img src="screenshots/04-terraform-apply-success.PNG" width="780" alt="Terraform apply complete"></a>
+Left: an apply creating the scanner function, its IAM bindings and the scheduler job. Right: a drift check on the core stack (34 state entries at that point, before the agent was added) that found no differences.
+
+<table>
+<tr>
+<td align="center"><a href="screenshots/04-terraform-apply-success.PNG"><img src="screenshots/04-terraform-apply-success.PNG" width="380" alt="Terraform apply complete"></a><br><sub>Apply complete</sub></td>
+<td align="center"><a href="screenshots/04b-terraform-state-no-drift.PNG"><img src="screenshots/04b-terraform-state-no-drift.PNG" width="380" alt="Terraform drift check"></a><br><sub>No drift on the core stack</sub></td>
+</tr>
+</table>
 
 ## CI and Security Checks
 
@@ -193,7 +200,7 @@ Every interaction is recorded:
 
 | Control | How it works |
 |---|---|
-| **Read-only by identity** | The agent runs as `cspm-agent`, which has only table-level BigQuery roles, job user, and access to one secret. It has no permission to modify any resource, so even a manipulated agent could not apply a fix. |
+| **Read-only by identity** | The agent runs as `cspm-agent`, which has read access to two BigQuery tables, edit access to its own audit table, the BigQuery job user role, and access to one secret. It has no permission to change the buckets or IAM policies it reports on, so even a manipulated agent could not apply a fix. |
 | **Tool allowlist** | The model can call four functions and nothing else. Wrappers hide internal parameters such as the database client. |
 | **Input validation** | Every argument is checked against a strict pattern before use. Values reach BigQuery only as query parameters, never inside SQL text. |
 | **Tool-call cap** | A hard limit of 6 tool calls per question stops loops and runaway cost. |
@@ -201,6 +208,10 @@ Every interaction is recorded:
 | **Prompt-injection stance** | Tool results are treated as data. Instructions that appear in resource names or other fields are ignored. |
 | **Audit trail** | Every interaction is written to `agent_audit_log` with the question, tool calls, response, model and whether schema validation passed. Failures are logged too. |
 | **Secrets** | The API key lives in Secret Manager. Terraform creates only the empty container, and the value is loaded by hand. |
+
+The agent's actual permissions, read back from Google Cloud (project-level, then per table):
+
+<a href="screenshots/22-agent-least-privilege.PNG"><img src="screenshots/22-agent-least-privilege.PNG" width="780" alt="Agent IAM roles"></a>
 
 ## Security Design Decisions
 
