@@ -192,9 +192,11 @@ When asked to change something, it declines and offers a draft for a human to re
 
 <a href="screenshots/20-agent-refuses-remediation.PNG"><img src="screenshots/20-agent-refuses-remediation.PNG" width="780" alt="Agent refuses remediation"></a>
 
-Asked for the fix itself, it looks up the finding and returns the draft: the `gcloud` commands and the Terraform change for a human to review. Nothing runs.
+Asked for the fix itself, it looks up the finding and returns a draft: the `gcloud` commands and the Terraform change for a human to review. Nothing runs.
 
 <a href="screenshots/23-agent-draft-fix-linkedin.png"><img src="screenshots/23-agent-draft-fix-linkedin.png" width="780" alt="Agent drafts a fix for human review"></a>
+
+<sub>*A simplified view of one real run, laid out for readability. In the terminal the agent prints plain text: the tool calls, the draft, a schema check and an audit row. To reproduce it, run `python3 scripts/run_agent_as_sa.py "Draft the fix for the public IAM binding on <bucket>. Do not apply it."`*</sub>
 
 Every interaction is recorded:
 
