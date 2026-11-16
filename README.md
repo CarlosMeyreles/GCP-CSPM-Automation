@@ -194,7 +194,7 @@ When asked to change something, it declines and offers a draft for a human to re
 
 Asked for the fix itself, it looks up the finding and returns the draft: the `gcloud` commands and the Terraform change for a human to review. Nothing runs.
 
-<a href="screenshots/23-agent-draft-fix.png"><img src="screenshots/23-agent-draft-fix.png" width="780" alt="Agent drafts a fix for human review"></a>
+<a href="screenshots/23-agent-draft-fix-linkedin.png"><img src="screenshots/23-agent-draft-fix-linkedin.png" width="780" alt="Agent drafts a fix for human review"></a>
 
 Every interaction is recorded:
 
