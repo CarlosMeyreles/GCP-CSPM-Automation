@@ -14,6 +14,19 @@ On top of the pipeline sits a **read-only Posture Advisor Agent** (Google ADK wi
 
 Everything validates in CI **without any GCP credentials**: Terraform format and validate, Checkov in strict mode, 54 unit tests, and a gitleaks scan of the full git history.
 
+**Results from the demo project:** the latest scan reports 1 CRITICAL finding and 0 HIGH, MEDIUM or LOW. The remediator enforced public access prevention on the demo bucket and recorded the state before and after. The one remaining CRITICAL finding is the bucket's public IAM binding, which is deliberately not auto-removed and is left for human review. All 54 tests pass in CI.
+
+## Skills Demonstrated
+
+- **Cloud security engineering (GCP):** least-privilege IAM, custom roles, service-account impersonation with no keys, Secret Manager, Cloud Asset Inventory, BigQuery audit logging
+- **Infrastructure as code:** Terraform with versioned remote state, 39 managed resources, drift checks
+- **DevSecOps:** GitHub Actions with zero cloud credentials, Checkov in strict mode with documented suppressions, gitleaks history scanning, pytest
+- **AI agent security:** read-only by identity, tool allowlist, tool-call cap, schema-validated output, full audit trail
+- **Safe automation:** dry-run default, allowlist, idempotency, before/after capture
+- **Compliance mapping:** CIS Google Cloud Foundation Benchmark (v3.0.0)
+- **Threat modeling:** STRIDE summary with residual risks stated
+- **Engineering judgment:** written limitations, debugging stories, and a scripted teardown
+
 ## Table of Contents
 
 1. [What it does](#what-it-does)
@@ -25,12 +38,13 @@ Everything validates in CI **without any GCP credentials**: Terraform format and
 7. [End-to-end validation](#end-to-end-validation)
 8. [Posture Advisor Agent](#posture-advisor-agent)
 9. [Agent Governance](#agent-governance)
-10. [Security Design Decisions](#security-design-decisions)
-11. [Known limitations](#known-limitations)
-12. [Debugging stories](#debugging-stories)
-13. [At enterprise scale I would add](#at-enterprise-scale-i-would-add)
-14. [Teardown](#teardown)
-15. [License](#license)
+10. [Threat Model (STRIDE)](#threat-model-stride)
+11. [Security Design Decisions](#security-design-decisions)
+12. [Known limitations](#known-limitations)
+13. [Debugging stories](#debugging-stories)
+14. [At enterprise scale I would add](#at-enterprise-scale-i-would-add)
+15. [Teardown](#teardown)
+16. [License](#license)
 
 ## What it does
 
@@ -61,6 +75,8 @@ flowchart LR
     AG --> GEM["Gemini"]
     SM["Secret Manager<br/>API key"] --> AG
 ```
+
+The scheduled path (Cloud Scheduler to Cloud Function) is deployed by Terraform, but the deployed function proved unreliable after a Terraform reconciliation (see [Known limitations](#known-limitations)). The validated demo runs the same code locally as the scanner service account.
 
 ## Tech stack
 
@@ -213,13 +229,26 @@ Every interaction is recorded:
 | **Input validation** | Every argument is checked against a strict pattern before use. Values reach BigQuery only as query parameters, never inside SQL text. |
 | **Tool-call cap** | A hard limit of 6 tool calls per question stops loops and runaway cost. |
 | **Validated output** | The final answer must be JSON matching a schema, and `actions_executed` can only be `"none"`. A failing answer is withheld and logged. |
-| **Prompt-injection stance** | Tool results are treated as data. Instructions that appear in resource names or other fields are ignored. |
+| **Prompt-injection stance (instruction-level)** | The agent's instructions say that tool results are data and that instructions embedded in them are ignored. This has not been adversarially tested. The controls that actually limit the damage are structural: no write access, a tool allowlist and schema-validated output. |
 | **Audit trail** | Every interaction is written to `agent_audit_log` with the question, tool calls, response, model and whether schema validation passed. Failures are logged too. |
 | **Secrets** | The API key lives in Secret Manager. Terraform creates only the empty container, and the value is loaded by hand. |
 
 The agent's actual permissions, read back from Google Cloud (project-level, then per table):
 
 <a href="screenshots/22-agent-least-privilege.PNG"><img src="screenshots/22-agent-least-privilege.PNG" width="780" alt="Agent IAM roles"></a>
+
+## Threat Model (STRIDE)
+
+A short threat model for this small system, with the residual risk stated where one remains.
+
+| Threat | Risk here | Mitigation | Residual risk |
+|---|---|---|---|
+| **Spoofing** | Someone impersonates the scanner or the agent | No service-account keys exist to steal. Scripts use short-lived impersonated tokens, and `serviceAccountTokenCreator` is granted per service account, never at project level | The operator account that can impersonate is the trust anchor |
+| **Tampering** | Findings, audit rows or infrastructure altered | The agent has no write access to the infrastructure. CI validates only and holds no credentials. Terraform state is versioned | The audit table is not append-only, because BigQuery has no insert-only role (see Known limitations) |
+| **Repudiation** | A change or an answer cannot be traced | Every remediation is written to `remediation_log` with before and after state. Every agent interaction, including failures, is written to `agent_audit_log` | The same tamper caveat as above |
+| **Information disclosure** | A secret or internal detail leaks | The Gemini key is in Secret Manager, never in code or Terraform state. Tool errors return only the exception class name. The agent reads two tables and one secret | Free-tier Gemini may use prompts for product improvement |
+| **Denial of service** | A runaway agent loop or oversized input | A hard cap of 6 tool calls per question and a 500-character limit on questions | The free-tier API quota can still be exhausted |
+| **Elevation of privilege** | The agent or scanner gains more access than intended | The scanner uses a custom role. The agent has table-level grants and no permission to change buckets or IAM. Output must match a schema where `actions_executed` can only be `"none"`. Remediation is limited to an allowlist | Prompt-injection resistance is instruction-level and untested |
 
 ## Security Design Decisions
 
@@ -238,17 +267,18 @@ CIS Google Cloud Foundation Benchmark mapping used by the agent: 5.1, 5.2, 1.5, 
 
 Stated up front, because they are real:
 
-- **The deployed Cloud Function was unreliable.** After a Terraform reconciliation it returned intermittent 404s, so the demo runs the same code locally. The code, tests and Terraform are unchanged.
+- **The deployed Cloud Function was unreliable.** After a Terraform reconciliation it returned intermittent 404s that were not root-caused, so the demo runs the same code locally. The scheduled path is deployed but is not the validated one. The code, tests and Terraform are unchanged.
 - **Security Command Center needs an organization** for project-level activation. Cloud Asset Inventory with a Storage API fallback replaces it here.
 - **Bucket-level IAM binding removal is not automated.** The allowlist skips it, and the agent drafts the fix for a human.
 - **Drafts are not copy-ready.** The drafted `gcloud` command leaves a `--role=ROLE` placeholder for the reviewer to fill in. Looking up the actual role is a planned improvement.
+- **Prompt-injection resistance is untested.** It rests on the agent's instructions plus structural controls. No test plants an injected instruction and checks the model ignores it.
 - **The audit log is not truly append-only.** BigQuery has no insert-only role, so the writer has table edit rights. A log sink to a locked bucket would close this.
 - **Free-tier Gemini may use prompts for product improvement.** This project contains no sensitive data. A real deployment would use a paid or Vertex AI endpoint.
 - **This is a single-project, personal-scale demo**, not an enterprise rollout.
 
 ## Debugging stories
 
-- **A 404 that was really out-of-memory.** The Cloud Function returned a Google Frontend 404 page. Logs showed it was killed at 256Mi. Raising to 512Mi and 1 CPU fixed it.
+- **A 404 that was really out-of-memory.** The Cloud Function returned a Google Frontend 404 page. Logs showed it was killed at 256Mi. Raising to 512Mi and 1 CPU fixed that failure. A separate intermittent 404 appeared later, after a Terraform reconciliation, and was not root-caused (see Known limitations).
 - **`git push` returned 403.** Token variants did not work. `gh auth login` with the device flow and `gh auth setup-git` fixed it.
 - **Impersonation login failed with "Missing required parameter: scope".** A line-wrapped URL was the cause. Moving impersonation into code removed the browser step.
 - **Checkov strict mode.** Eight findings were turned into documented, justified suppressions rather than silencing the check.
@@ -267,6 +297,7 @@ Stated up front, because they are real:
 - **An append-only audit sink** to a retention-locked bucket
 - **A human approval workflow** (ticket or chat approval) before any automated remediation outside the allowlist
 - **Vertex AI** with VPC Service Controls in place of the free API key
+- **Adversarial prompt-injection tests** in CI
 
 ## Teardown
 
@@ -283,3 +314,7 @@ Two things the script cannot do for you: delete the Gemini API key in Google AI 
 ## License
 
 MIT
+
+---
+
+Related: [GCP Security Operations Pipeline](https://github.com/CarlosMeyreles/GCP-SecOps-Pipeline) (Project 01) | [Carlos Meyreles on LinkedIn](https://www.linkedin.com/in/carlosmeyreles/)
