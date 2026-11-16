@@ -184,6 +184,14 @@ The agent answers questions from BigQuery data. It does not guess, and it does n
 | `explain_control` | read-only | Explains a CIS control from a local reference file |
 | `draft_fix` | **draft-only** | Returns suggested `gcloud` or Terraform as text. Executes nothing |
 
+**At a glance:** ask for a fix and the agent looks up the finding and returns a draft for a human to review. Nothing runs.
+
+<a href="screenshots/23-agent-draft-fix-linkedin.png"><img src="screenshots/23-agent-draft-fix-linkedin.png" width="780" alt="Agent drafts a fix for human review"></a>
+
+<sub>*A simplified view of one real run, laid out for readability. The raw terminal screenshots below show the same agent in detail. To reproduce this run: `python3 scripts/run_agent_as_sa.py "Draft the fix for the public IAM binding on <bucket>. Do not apply it."`*</sub>
+
+**In detail:**
+
 It answers from live data, with the tool calls visible:
 
 <a href="screenshots/19-agent-answers-findings.PNG"><img src="screenshots/19-agent-answers-findings.PNG" width="780" alt="Agent answers findings question"></a>
@@ -191,12 +199,6 @@ It answers from live data, with the tool calls visible:
 When asked to change something, it declines and offers a draft for a human to review:
 
 <a href="screenshots/20-agent-refuses-remediation.PNG"><img src="screenshots/20-agent-refuses-remediation.PNG" width="780" alt="Agent refuses remediation"></a>
-
-Asked for the fix itself, it looks up the finding and returns a draft: the `gcloud` commands and the Terraform change for a human to review. Nothing runs.
-
-<a href="screenshots/23-agent-draft-fix-linkedin.png"><img src="screenshots/23-agent-draft-fix-linkedin.png" width="780" alt="Agent drafts a fix for human review"></a>
-
-<sub>*A simplified view of one real run, laid out for readability. In the terminal the agent prints plain text: the tool calls, the draft, a schema check and an audit row. To reproduce it, run `python3 scripts/run_agent_as_sa.py "Draft the fix for the public IAM binding on <bucket>. Do not apply it."`*</sub>
 
 Every interaction is recorded:
 
